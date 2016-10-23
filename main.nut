@@ -205,7 +205,7 @@ function HeliFerry::BuildStatues() {
         if(AICompany.GetBankBalance(AICompany.COMPANY_SELF) < 10000000)
             return;
         if(AITown.PerformTownAction(town, AITown.TOWN_ACTION_BUILD_STATUE))
-            AILog.Error("Building statue in " + AITown.GetName(town));
+            AILog.Info("Building statue in " + AITown.GetName(town));
         else
             AILog.Error("Failed to build statue in " + AITown.GetName(town) + ": " + AIError.GetLastErrorString());
     }

@@ -8,15 +8,19 @@ class Heli {
     city_center_range = 5;
     /* Min city population to build heliport. */
     min_population = 500;
-    /* Min passengers on existing heliport to create a new route. */
-    min_passengers = 250;
     /* Max helicopters per heliport. */
     max_vehicles_per_heliport = 3;
+    /* Max distance between the cities. */
+    max_distance = 300;
     /* Minimal money left after buying something. */
     min_balance = 10000;
+    /* New route is build if waiting passengers > this value * capacity of current best vehicle. */
+    req_mul = 1.25;
     
     /* Passengers cargo id. */
     _passenger_cargo_id = -1;
+    /* Min passengers to open a new route, it's req_mul * best vehicle capacity. */
+    _min_passengers = 999999;
     
     constructor() {
         this._passenger_cargo_id = GetPassengersCargo();
@@ -142,7 +146,9 @@ function Heli::GetBestHelicopter() {
     /* Get the "best" model. */
     engines.Valuate(HeliModelRating);
     engines.Sort(AIAbstractList.SORT_BY_VALUE, false);
-    return engines.Begin();
+    local best = engines.Begin();
+    this._min_passengers = floor(this.req_mul * AIEngine.GetCapacity(best));
+    return best;
 }
 
 function Heli::BuildAndStartHelicopter(heliport1, heliport2) {
@@ -192,7 +198,7 @@ function Heli::CanTakeMoreHelicopters(heliport) {
     local station_id = AIStation.GetStationID(heliport);
     local passengers = AIStation.GetCargoWaiting(station_id, this._passenger_cargo_id);
     local vehicles = AIVehicleList_Station(station_id).Count();
-    return vehicles == 0 || (passengers > this.min_passengers && vehicles < this.max_vehicles_per_heliport);
+    return vehicles == 0 || (passengers > this._min_passengers && vehicles < this.max_vehicles_per_heliport);
 }
 
 function Heli::AreHelicoptersAllowed() {
@@ -235,53 +241,49 @@ function Heli::BuildNewHeliRoutes() {
     towns.Valuate(AITown.GetPopulation);
     towns.KeepAboveValue(this.min_population);
     towns.Sort(AIList.SORT_BY_VALUE, AIList.SORT_DESCENDING);
-    AILog.Info(towns.Count() + " towns eligible for heliport");
+    AILog.Info(towns.Count() + " towns eligible for heliport, min " + this._min_passengers + " passengers to open a new route");
     
     for(local city1 = towns.Begin(); towns.HasNext(); city1 = towns.Next()) {
-        local city1_loc = AITown.GetLocation(city1);
-        
-        /* If there is already a heliport in the city, let's check if it can accept more passangers. */
+        /* If there is already a heliport in the city, let's check if it can accept more passengers. */
         local heliport_a = FindHeliPort(city1);
         if(heliport_a != -1 && !CanTakeMoreHelicopters(heliport_a))
             continue;
         
-        /* Get the closest city to this city with population more than specified. */
+        /* Get cities which are good for connection. */
+        local city1_loc = AITown.GetLocation(city1);
         local towns2 = AITownList();
         towns2.RemoveItem(city1);
         towns2.Valuate(AITown.GetPopulation);
         towns2.KeepAboveValue(this.min_population);
         towns2.Valuate(AITown.GetDistanceManhattanToTile, city1_loc);
         towns2.KeepAboveValue(30); /* Cities too close. */
+        towns2.KeepBelowValue(this.max_distance); /* Cities too far away. */
         towns2.Sort(AIList.SORT_BY_VALUE, AIList.SORT_ASCENDING);
-        local city2 = towns2.Begin();
-        local city2_loc = AITown.GetLocation(city2);
+        
+        for(local city2 = towns2.Begin(); towns2.HasNext(); city2 = towns2.Next()) {
+            local heliport_b = FindHeliPort(city2);
+            /* No more place for new heli in this one. */
+            if(heliport_b != -1 && !CanTakeMoreHelicopters(heliport_b))
+                continue;
 
-        /* Build heliports, don't make new connections for heliports with few passengers. */
-        if(heliport_a == -1)
-            heliport_a = BuildHeliPort(city1_loc);
-        if(heliport_a == -1)
-            continue;
-        local heliport_b = FindHeliPort(city2);
-        if(heliport_b == -1)
-            heliport_b = BuildHeliPort(city2_loc);
-        if(heliport_b == -1)
-            continue;
-    
-        /* Build helicopters. */
-        if(!AreHelicoptersAllowed())
-            return false;
-        AILog.Info("Building helicopter route between " + AITown.GetName(city1) + " and " + AITown.GetName(city2));
-        if(!BuildAndStartHelicopter(heliport_a, heliport_b))
-            continue;
-        if(CanTakeMoreHelicopters(heliport_b))
-            BuildAndStartHelicopter(heliport_b, heliport_a);
+            /* Build heliports. */
+            if(heliport_a == -1)
+                heliport_a = BuildHeliPort(city1_loc);
+            if(heliport_a == -1)
+                break;
+            if(heliport_b == -1)
+                heliport_b = BuildHeliPort(AITown.GetLocation(city2));
+            if(heliport_b == -1)
+                continue;
+        
+            /* Build helicopters. */
+            if(!AreHelicoptersAllowed())
+                return false;
+            AILog.Info("Building helicopter route between " + AITown.GetName(city1) + " and " + AITown.GetName(city2));
+            if(BuildAndStartHelicopter(heliport_a, heliport_b))
+                break;
+        }
     }
-    
-    /* If there are no more cities to build heliport in, let's buy more helicopters for the existing heliports. */
-    /*local heliports_list = AIStationList(AIStation.STATION_AIRPORT);
-    heliports_list.Valuate(AIStation.GetCargoWaiting, this._passenger_cargo_id);
-    heliports_list.Sort(AIList.SORT_BY_VALUE, AIList.SORT_DESCENDING);
-    AILog.Warning("Max passengers waiting: " + AIStation.GetCargoWaiting(heliports_list.Begin(), this._passenger_cargo_id));*/
     
     return true;
 }

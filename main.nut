@@ -4,6 +4,8 @@ require("ferry.nut");
 require("pathfinder/line.nut");
 require("pathfinder/coast.nut");
 
+// TODO: add return values to all functions executed in while, build statues if all of them return 0
+
 class HeliFerry extends AIController {
     /* These vehicles will be sold. */
     sell_group = [-1, -1];

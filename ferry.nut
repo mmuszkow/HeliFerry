@@ -18,9 +18,13 @@ class Ferry {
     pathfinder = null;
     /* Minimal money left after buying something. */
     min_balance = 10000;
+    /* New route is build if waiting passengers > this value * capacity of current best vehicle. */
+    req_mul = 1.25;
     
     /* Passengers cargo id. */
     _passenger_cargo_id = -1;
+    /* Min passengers to open a new route, it's req_mul * best vehicle capacity. */
+    _min_passengers = 999999;
     
     constructor(pf) {
         this.pathfinder = pf;
@@ -173,7 +177,9 @@ function Ferry::GetBestFerry() {
     /* Get the "best" model. */
     engines.Valuate(FerryModelRating);
     engines.Sort(AIAbstractList.SORT_BY_VALUE, false);
-    return engines.Begin();
+    local best = engines.Begin();
+    this._min_passengers = floor(this.req_mul * AIEngine.GetCapacity(best));
+    return best;
 }
 
 function Ferry::BuildAndStartFerry(dock1, dock2, path) {
@@ -245,14 +251,14 @@ function Ferry::BuildFerryRoutes() {
     towns.Valuate(GetCoastTileClosestToCity, this.max_dock_distance, this._passenger_cargo_id);
     towns.RemoveValue(-1);
     
-    AILog.Info(towns.Count() + " towns eligible for ferry");
+    AILog.Info(towns.Count() + " towns eligible for ferry, min " + this._min_passengers + " passengers to open a new route");
     
     for(local town = towns.Begin(); towns.HasNext(); town = towns.Next()) {        
         local dock1 = FindDock(town);
         /* If there is already a dock in the city and there 
            are not many passengers waiting there, there is no point
            in opening a new route. */
-        if(dock1 != -1 && AIStation.GetCargoWaiting(AIStation.GetStationID(dock1), this._passenger_cargo_id) < 150)
+        if(dock1 != -1 && AIStation.GetCargoWaiting(AIStation.GetStationID(dock1), this._passenger_cargo_id) < this._min_passengers)
             continue;
         
         /* Find dock or potential place for dock. */
@@ -274,9 +280,9 @@ function Ferry::BuildFerryRoutes() {
             /* If there is already a dock in the city and there 
                are not many passengers waiting there, there is no point
                in opening a new route. */
-            if(dock2 != -1 && AIStation.GetCargoWaiting(AIStation.GetStationID(dock2), this._passenger_cargo_id) < 150)
+            if(dock2 != -1 && AIStation.GetCargoWaiting(AIStation.GetStationID(dock2), this._passenger_cargo_id) < this._min_passengers)
                 continue;
-            
+                        
             /* Find dock or potential place for dock. */
             local coast2 = dock2;
             if(coast2 == -1)

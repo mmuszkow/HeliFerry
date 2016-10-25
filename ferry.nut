@@ -75,7 +75,7 @@ function GetCoastTilesCloseToCity(town, range, cargo_id) {
 }
 function GetCoastTileClosestToCity(town, range, cargo_id) {
     local tiles = GetCoastTilesCloseToCity(town, range, cargo_id);
-    if(tiles.Count() == 0)
+    if(tiles.IsEmpty())
         return -1;
     
     local city = AITown.GetLocation(town);
@@ -88,7 +88,7 @@ function Ferry::FindDock(town) {
     local docks = AIStationList(AIStation.STATION_DOCK);
     docks.Valuate(AIStation.GetNearestTown);
     docks.KeepValue(town);
-    if(docks.Count() == 0)
+    if(docks.IsEmpty())
         return -1;
     else
         return AIStation.GetLocation(docks.Begin());
@@ -117,7 +117,7 @@ function Ferry::FindWaterDepot(dock, range) {
     depots.Valuate(AIMap.DistanceManhattan, dock);
     depots.KeepBelowValue(range);
     depots.Sort(AIList.SORT_BY_VALUE, AIList.SORT_ASCENDING);
-    if(depots.Count() == 0)
+    if(depots.IsEmpty())
         return -1;
     else
         return depots.Begin();
@@ -149,7 +149,7 @@ function Ferry::GetBuoy(tile) {
     SafeAddRectangle(tiles, tile, 3);
     tiles.Valuate(AIMarine.IsBuoyTile);
     tiles.KeepValue(1);
-    if(tiles.Count() == 0) {
+    if(tiles.IsEmpty()) {
         AIMarine.BuildBuoy(tile);
         return tile;
     } else
@@ -171,7 +171,7 @@ function FerryModelRating(model) {
 
 function Ferry::GetBestFerry() {
     local engines = GetFerryModels();
-    if(engines.Count() == 0)
+    if(engines.IsEmpty())
         return -1;
     
     /* Get the "best" model. */
@@ -180,6 +180,42 @@ function Ferry::GetBestFerry() {
     local best = engines.Begin();
     this._min_passengers = floor(this.req_mul * AIEngine.GetCapacity(best));
     return best;
+}
+
+function Ferry::CloneFerry(dock1, dock2) {    
+    /* Check if these 2 docks are indeed served by an existing vehicle. */
+    local dock1_vehs = AIVehicleList_Station(AIStation.GetStationID(dock1));
+    local dock2_vehs = AIVehicleList_Station(AIStation.GetStationID(dock2));
+    dock1_vehs.KeepList(dock2_vehs);
+    if(dock1_vehs.IsEmpty())
+        return false;
+    
+    /* Find the depot where we can clone the vehicle. */
+    local depot = FindWaterDepot(dock1, 10);
+    if(depot == -1)
+        depot = FindWaterDepot(dock2, 10);
+    if(depot == -1)
+        depot = BuildWaterDepot(dock1, 10);
+    if(depot == -1) {
+        AILog.Error("Failed to build the water depot: " + AIError.GetLastErrorString());
+        return true; /* because this will break the outer loop */
+    }
+    
+    local vehicle = dock1_vehs.Begin();
+    local engine = AIVehicle.GetEngineType(vehicle);
+    
+    /* Wait until we have the money. */
+    while(AIEngine.IsValidEngine(engine) && 
+         (AIEngine.GetPrice(engine) > AICompany.GetBankBalance(AICompany.COMPANY_SELF) - this.min_balance)) {}
+    
+    local cloned = AIVehicle.CloneVehicle(depot, vehicle, true);
+    if(!AIVehicle.IsValidVehicle(cloned)) {
+        AILog.Error("Failed to clone vehicle: " + AIError.GetLastErrorString());
+        return true; /* because this will break the outer loop */
+    }
+    
+    AIVehicle.StartStopVehicle(cloned);
+    return true;
 }
 
 function Ferry::BuildAndStartFerry(dock1, dock2, path) {
@@ -282,17 +318,21 @@ function Ferry::BuildFerryRoutes() {
                in opening a new route. */
             if(dock2 != -1 && AIStation.GetCargoWaiting(AIStation.GetStationID(dock2), this._passenger_cargo_id) < this._min_passengers)
                 continue;
+            
+            /* If there is already a vehicle servicing this route, clone it, it's much faster. */
+            if(dock1 != -1 && dock2 != -1 && CloneFerry(dock1, dock2)) {
+                AILog.Info("Adding next ferry between " + AITown.GetName(town) + " and " + AITown.GetName(town2));
+                continue;
+            }
                         
             /* Find dock or potential place for dock. */
             local coast2 = dock2;
             if(coast2 == -1)
                 coast2 = GetCoastTileClosestToCity(town2, this.max_dock_distance, this._passenger_cargo_id);
-            
+                    
             /* Too close. */
             if(AIMap.DistanceManhattan(coast1, coast2) < 20)
-                continue;
-            
-            /* TODO: if docks exist, copy the existing route instead of searching path again. */
+                continue;            
             
             /* Skip cities that are not connected by water. */
             if(!this.pathfinder.FindPath(coast1, coast2, this.max_path_len))

@@ -140,7 +140,7 @@ function HeliModelRating(model) {
 
 function Heli::GetBestHelicopter() {
     local engines = GetHelicopterModels();
-    if(engines.Count() == 0)
+    if(engines.IsEmpty())
         return -1;
     
     /* Get the "best" model. */

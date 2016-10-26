@@ -2,6 +2,8 @@
    Builds ferries (hovercrafts). */
 
 require("utils.nut");
+require("pathfinder/line.nut");
+require("pathfinder/coast.nut");
 
 class Ferry {
     /* Max dock distance from the city center. */
@@ -14,8 +16,6 @@ class Ferry {
     buoy_distance = 25;
     /* Max connection length. */
     max_path_len = 450;
-    /* Path finder. */
-    pathfinder = null;
     /* Minimal money left after buying something. */
     min_balance = 10000;
     /* New route is build if waiting passengers > this value * capacity of current best vehicle. */
@@ -25,9 +25,11 @@ class Ferry {
     _passenger_cargo_id = -1;
     /* Min passengers to open a new route, it's req_mul * best vehicle capacity. */
     _min_passengers = 999999;
+    /* Pathfinders. */
+    _line_pathfinder = StraightLinePathfinder();
+    _coast_pathfinder = CoastPathfinder();
     
-    constructor(pf) {
-        this.pathfinder = pf;
+    constructor() {
         this._passenger_cargo_id = GetPassengersCargo();
     }
 }
@@ -182,13 +184,14 @@ function Ferry::GetBestFerry() {
     return best;
 }
 
+/* 0 - no existing route, 1 - error, 2 - success */
 function Ferry::CloneFerry(dock1, dock2) {    
     /* Check if these 2 docks are indeed served by an existing vehicle. */
     local dock1_vehs = AIVehicleList_Station(AIStation.GetStationID(dock1));
     local dock2_vehs = AIVehicleList_Station(AIStation.GetStationID(dock2));
     dock1_vehs.KeepList(dock2_vehs);
     if(dock1_vehs.IsEmpty())
-        return false;
+        return 0;
     
     /* Find the depot where we can clone the vehicle. */
     local depot = FindWaterDepot(dock1, 10);
@@ -198,7 +201,7 @@ function Ferry::CloneFerry(dock1, dock2) {
         depot = BuildWaterDepot(dock1, 10);
     if(depot == -1) {
         AILog.Error("Failed to build the water depot: " + AIError.GetLastErrorString());
-        return true; /* because this will break the outer loop */
+        return 1;
     }
     
     local vehicle = dock1_vehs.Begin();
@@ -211,11 +214,11 @@ function Ferry::CloneFerry(dock1, dock2) {
     local cloned = AIVehicle.CloneVehicle(depot, vehicle, true);
     if(!AIVehicle.IsValidVehicle(cloned)) {
         AILog.Error("Failed to clone vehicle: " + AIError.GetLastErrorString());
-        return true; /* because this will break the outer loop */
+        return 1;
     }
     
     AIVehicle.StartStopVehicle(cloned);
-    return true;
+    return 2;
 }
 
 function Ferry::BuildAndStartFerry(dock1, dock2, path) {
@@ -239,9 +242,8 @@ function Ferry::BuildAndStartFerry(dock1, dock2, path) {
     
     /* Build buoys every n tiles. */
     local buoys = [];
-    for(local i = this.buoy_distance; i<path.len()-this.buoy_distance; i += this.buoy_distance) {
+    for(local i = this.buoy_distance; i<path.len()-this.buoy_distance/2; i += this.buoy_distance)
         buoys.push(GetBuoy(path[i]));
-    }
     
     /* Buy the most expensive vehicle. */
     local vehicle = AIVehicle.BuildVehicle(depot, engine);
@@ -320,22 +322,33 @@ function Ferry::BuildFerryRoutes() {
                 continue;
             
             /* If there is already a vehicle servicing this route, clone it, it's much faster. */
-            if(dock1 != -1 && dock2 != -1 && CloneFerry(dock1, dock2)) {
-                AILog.Info("Adding next ferry between " + AITown.GetName(town) + " and " + AITown.GetName(town2));
-                continue;
+            if(dock1 != -1 && dock2 != -1) {
+                local clone_res = CloneFerry(dock1, dock2);
+                if(clone_res == 2) {
+                    AILog.Info("Adding next ferry between " + AITown.GetName(town) + " and " + AITown.GetName(town2));
+                    continue;
+                } else if(clone_res == 1) {
+                    /* Error. */
+                    continue;
+                }
             }
                         
             /* Find dock or potential place for dock. */
             local coast2 = dock2;
             if(coast2 == -1)
                 coast2 = GetCoastTileClosestToCity(town2, this.max_dock_distance, this._passenger_cargo_id);
-                    
+            
             /* Too close. */
             if(AIMap.DistanceManhattan(coast1, coast2) < 20)
                 continue;            
             
             /* Skip cities that are not connected by water. */
-            if(!this.pathfinder.FindPath(coast1, coast2, this.max_path_len))
+            local path = null;
+            if(this._line_pathfinder.FindPath(coast1, coast2, this.max_path_len))
+                path = this._line_pathfinder.path;
+            else if(this._coast_pathfinder.FindPath(coast1, coast2, this.max_path_len))
+                path = this._coast_pathfinder.path;
+            else
                 continue;
             
             AILog.Info("Building ferry between " + AITown.GetName(town) + " and " + AITown.GetName(town2));
@@ -356,7 +369,7 @@ function Ferry::BuildFerryRoutes() {
             /* Buy and schedule ship. */
             if(!AreFerriesAllowed())
                 return false;
-            BuildAndStartFerry(dock1, dock2, this.pathfinder.path);
+            BuildAndStartFerry(dock1, dock2, path);
         }
     }
     return true;

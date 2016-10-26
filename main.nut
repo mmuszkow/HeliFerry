@@ -1,9 +1,6 @@
 require("heli.nut");
 require("ferry.nut");
 
-require("pathfinder/line.nut");
-require("pathfinder/coast.nut");
-
 // TODO: add return values to all functions executed in while, build statues if all of them return 0
 
 class HeliFerry extends AIController {
@@ -37,7 +34,7 @@ function HeliFerry::Start() {
     AICompany.SetAutoRenewStatus(true);
     
     local heli = Heli();
-    local ferry = Ferry(null);
+    local ferry = Ferry();
     while(true) {
         /* Build heliports first as they are the most profitable 
            and there is a limit of airports per city. */
@@ -50,9 +47,6 @@ function HeliFerry::Start() {
         /* Build ferries, they are not as profitable, but usually other AIs 
            don't build water units so we can still have some space here. 
            We may get also above the aircrafts limit. */
-        ferry.pathfinder = StraightLinePathfinder();
-        ferry.BuildFerryRoutes();
-        ferry.pathfinder = CoastPathfinder();
         ferry.BuildFerryRoutes();
         
         /* Sell unprofiltable vehicles. */

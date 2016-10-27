@@ -406,7 +406,7 @@ function Ferry::BuildFerryRoutes() {
         }
     }
             
-    this._not_connected.Debug();
+    //this._not_connected.Debug();
     
     return ferries_built;
 }

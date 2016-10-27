@@ -192,7 +192,17 @@ function Ferry::BuildWaterDepot(dock, max_distance) {
     while(AIMarine.GetBuildCost(AIMarine.BT_DEPOT) > AICompany.GetBankBalance(AICompany.COMPANY_SELF) - this.min_balance) {}
     
     for(local depot = depotarea.Begin(); depotarea.HasNext(); depot = depotarea.Next()) {
-        local front = AIMap.GetTileIndex(AIMap.GetTileX(depot), AIMap.GetTileY(depot)+1);
+        local x = AIMap.GetTileX(depot);
+        local y = AIMap.GetTileY(depot);
+        local front = AIMap.GetTileIndex(x, y+1);
+        
+        /* To avoid building a depot on a river. */
+        if(!AITile.IsWaterTile(front) ||
+            !AITile.IsWaterTile(AIMap.GetTileIndex(x, y-1)) ||
+            !AITile.IsWaterTile(AIMap.GetTileIndex(x-1, y)) ||
+            !AITile.IsWaterTile(AIMap.GetTileIndex(x+1, y)))
+            continue;
+            
         if(AIMarine.BuildWaterDepot(depot, front))
             return depot;
     }

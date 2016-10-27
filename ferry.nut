@@ -5,6 +5,58 @@ require("utils.nut");
 require("pathfinder/line.nut");
 require("pathfinder/coast.nut");
 
+class PairHashSet {
+    _data = [];
+    _size = 0;
+    
+    constructor(size) {
+        _data = array(size);
+        _size = size;
+    }
+}
+
+/* Cantor pairing function. */
+function PairHashSet::Hash(val1, val2) {
+    local hash = ((((val1 + val2) * (val1 + val2 + 1)) >> 1) + val2) % this._size;
+    return hash < 0 ? hash + this._size : hash;
+}
+
+function PairHashSet::_Add(val1, val2, hash) {
+    if(this._data[hash] == null)
+        this._data[hash] = [];
+    this._data[hash].append([val1, val2]);
+}
+
+function PairHashSet::Add(val1, val2) {
+    local hash = Hash(val1, val2);
+    _Add(val1, val2, hash);
+    _Add(val2, val1, hash);
+}
+
+function PairHashSet::Contains(val1, val2) {
+    local hash = Hash(val1, val2);
+    if(this._data[hash] == null)
+        return false;
+    for(local i = 0; i < this._data[hash].len(); i++) {
+        if(this._data[hash][i][0] == val1 && this._data[hash][i][1] == val2)
+            return true;
+    }
+    return false;
+}
+
+function PairHashSet::Debug() {
+    local non_zero = 0;
+    local sum = 0;
+    local maxx = 0;
+    for(local i = 0; i < this._size; i++)
+        if(this._data[i] != null) {
+            non_zero++;
+            sum += this._data[i].len();
+            maxx = max(maxx, this._data[i].len());
+        }
+    AILog.Info("HashSet size=" + this._size + " non_zero=" + non_zero + " avg. len=" + (sum / non_zero) + " max=" + maxx);
+}
+
 class Ferry {
     /* Max dock distance from the city center. */
     max_dock_distance = 20;
@@ -28,6 +80,8 @@ class Ferry {
     /* Pathfinders. */
     _line_pathfinder = StraightLinePathfinder();
     _coast_pathfinder = CoastPathfinder();
+    /* Cache of which cities are not connected. */
+    _not_connected = PairHashSet(4096);
     
     constructor() {
         this._passenger_cargo_id = GetPassengersCargo();
@@ -340,7 +394,10 @@ function Ferry::BuildFerryRoutes() {
             
             /* Too close. */
             if(AIMap.DistanceManhattan(coast1, coast2) < 20)
-                continue;            
+                continue;
+
+            if(this._not_connected.Contains(coast1, coast2))
+                continue;
             
             /* Skip cities that are not connected by water. */
             local path = null;
@@ -348,8 +405,10 @@ function Ferry::BuildFerryRoutes() {
                 path = this._line_pathfinder.path;
             else if(this._coast_pathfinder.FindPath(coast1, coast2, this.max_path_len))
                 path = this._coast_pathfinder.path;
-            else
+            else {
+                this._not_connected.Add(coast1, coast2);
                 continue;
+            }
             
             AILog.Info("Building ferry between " + AITown.GetName(town) + " and " + AITown.GetName(town2));
             /* Build docks if needed. */
@@ -372,5 +431,8 @@ function Ferry::BuildFerryRoutes() {
             BuildAndStartFerry(dock1, dock2, path);
         }
     }
+    
+    this._not_connected.Debug();
+    
     return true;
 }

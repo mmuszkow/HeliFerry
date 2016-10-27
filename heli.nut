@@ -231,17 +231,16 @@ function Heli::AreHelicoptersAllowed() {
 }
 
 function Heli::BuildNewHeliRoutes() {
+    local helis_built = 0;
     if(!AreHelicoptersAllowed())
-        return false;
+        return helis_built;
 
     /* Get the cities with minimal population. */
     local towns = AITownList();
-    //towns.Valuate(AITown.GetRating, AICompany.COMPANY_SELF);
-    //towns.KeepValue(AITown.TOWN_RATING_NONE);
     towns.Valuate(AITown.GetPopulation);
     towns.KeepAboveValue(this.min_population);
     towns.Sort(AIList.SORT_BY_VALUE, AIList.SORT_DESCENDING);
-    AILog.Info(towns.Count() + " towns eligible for heliport, min " + this._min_passengers + " passengers to open a new route");
+    //AILog.Info(towns.Count() + " towns eligible for heliport, min " + this._min_passengers + " passengers to open a new route");
     
     for(local city1 = towns.Begin(); towns.HasNext(); city1 = towns.Next()) {
         /* If there is already a heliport in the city, let's check if it can accept more passengers. */
@@ -278,12 +277,14 @@ function Heli::BuildNewHeliRoutes() {
         
             /* Build helicopters. */
             if(!AreHelicoptersAllowed())
-                return false;
+                return helis_built;
             AILog.Info("Building helicopter route between " + AITown.GetName(city1) + " and " + AITown.GetName(city2));
-            if(BuildAndStartHelicopter(heliport_a, heliport_b))
+            if(BuildAndStartHelicopter(heliport_a, heliport_b)) {
+                helis_built++;
                 break;
+            }
         }
     }
     
-    return true;
+    return helis_built;
 }

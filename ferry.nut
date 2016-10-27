@@ -305,8 +305,9 @@ function Ferry::BuildAndStartFerry(dock1, dock2, path) {
 }
 
 function Ferry::BuildFerryRoutes() {
+    local ferries_built = 0;
     if(!AreFerriesAllowed())
-        return false;
+        return ferries_built;
 
     local towns = AITownList();
     towns.Valuate(AITown.GetPopulation);
@@ -314,7 +315,7 @@ function Ferry::BuildFerryRoutes() {
     towns.Valuate(GetCoastTileClosestToCity, this.max_dock_distance, this._passenger_cargo_id);
     towns.RemoveValue(-1);
     
-    AILog.Info(towns.Count() + " towns eligible for ferry, min " + this._min_passengers + " passengers to open a new route");
+    //AILog.Info(towns.Count() + " towns eligible for ferry, min " + this._min_passengers + " passengers to open a new route");
     
     for(local town = towns.Begin(); towns.HasNext(); town = towns.Next()) {        
         local dock1 = FindDock(town);
@@ -351,6 +352,7 @@ function Ferry::BuildFerryRoutes() {
                 local clone_res = CloneFerry(dock1, dock2);
                 if(clone_res == 2) {
                     AILog.Info("Adding next ferry between " + AITown.GetName(town) + " and " + AITown.GetName(town2));
+                    ferries_built++;
                     continue;
                 } else if(clone_res == 1) {
                     /* Error. */
@@ -398,10 +400,13 @@ function Ferry::BuildFerryRoutes() {
         
             /* Buy and schedule ship. */
             if(!AreFerriesAllowed())
-                return false;
-            BuildAndStartFerry(dock1, dock2, path);
+                return ferries_built;
+            if(BuildAndStartFerry(dock1, dock2, path))
+                ferries_built++;
         }
     }
+            
+    this._not_connected.Debug();
     
-    return true;
+    return ferries_built;
 }

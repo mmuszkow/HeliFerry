@@ -26,7 +26,7 @@ class Heli {
         this._passenger_cargo_id = GetPassengersCargo();
     }
 }
-   
+
 /* Find closest helidepot within specified range. */
 function Heli::FindHeliDepot(city_loc, range) {
     local stationlist = AIStationList(AIStation.STATION_AIRPORT);

@@ -64,13 +64,13 @@ function HeliFerry::Start() {
             statues_founded = BuildStatues();
         
         /* Print summary/ */
-        if(new_helis > 0) AILog.Info("New helicopter routes: " + new_helis);
-        if(new_ferries > 0) AILog.Info("New ferry routes: " + new_ferries);
+        if(new_helis > 1) AILog.Info("New helicopter routes: " + new_helis);
+        if(new_ferries > 1) AILog.Info("New ferry routes: " + new_ferries);
         if(unprofitable_sold > 0) AILog.Info("Unprofitable vehicles sold: " + unprofitable_sold);
         if(upgraded_helis > 0) AILog.Info("Helicopters sent for upgrading: " + upgraded_helis);
         if(upgraded_ferries > 0) AILog.Info("Ferries sent for upgrading: " + upgraded_ferries);
         if(old_replaced > 0) AILog.Info("Old vehicles sent for replacing: " + old_replaced);
-        if(statues_founded > 0) AILog.Info("Statues founded: " + statues_founded);
+        if(statues_founded > 1) AILog.Info("Statues founded: " + statues_founded);
         
         this.Sleep(50);
     }
@@ -143,7 +143,7 @@ function HeliFerry::UpgradeModel(best_model, vehicle_type) {
         not_best_model.Valuate(AIVehicle.GetEngineType);
         not_best_model.RemoveValue(best_model);
         if(not_best_model.Count() > 0) {
-            AILog.Info("Found " + not_best_model.Count() + " upgradable vehicles");
+            //AILog.Info("Found " + not_best_model.Count() + " upgradable vehicles");
             
             /* We need to have money. */
             local min_balance = AICompany.GetAutoRenewMoney(AICompany.COMPANY_SELF);

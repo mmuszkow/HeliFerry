@@ -356,6 +356,8 @@ function Ferry::BuildFerryRoutes() {
                     continue;
                 } else if(clone_res == 1) {
                     /* Error. */
+                    if(!AreFerriesAllowed())
+                        return ferries_built;
                     continue;
                 }
             }
@@ -399,10 +401,10 @@ function Ferry::BuildFerryRoutes() {
             }
         
             /* Buy and schedule ship. */
-            if(!AreFerriesAllowed())
-                return ferries_built;
             if(BuildAndStartFerry(dock1, dock2, path))
                 ferries_built++;
+            else if(!AreFerriesAllowed())
+                return ferries_built;
         }
     }
             

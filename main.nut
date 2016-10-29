@@ -23,16 +23,23 @@ function HeliFerry::Start() {
     if(!AIGroup.IsValidGroup(this.sell_group[0]) || !AIGroup.IsValidGroup(this.sell_group[1]))
         AILog.Error("Cannot create a vehicles group");
     
-    /* Get max loan. */
-    local loan_limit = AICompany.GetMaxLoanAmount();
-    AICompany.SetLoanAmount(loan_limit);
-    
     /* Autorenew vehicles when old. */
     AICompany.SetAutoRenewMonths(-this.max_age_left);
     AICompany.SetAutoRenewStatus(true);
     
+    /* Check if we have anything to do, if not repay the loan and wait. */
     local heli = Heli();
     local ferry = Ferry();
+    if(!heli.AreHelicoptersAllowed() && !ferry.AreFerriesAllowed()) {
+        AILog.Warning("Not possible to build neither helicopters, nor ferries - falling asleep");
+        AICompany.SetLoanAmount(0);
+    }
+    while(!heli.AreHelicoptersAllowed() && !ferry.AreFerriesAllowed()) { this.Sleep(1000); }
+    
+    /* Get max loan. */
+    local loan_limit = AICompany.GetMaxLoanAmount();
+    AICompany.SetLoanAmount(loan_limit);
+        
     while(true) {
         /* Build heliports first as they are the most profitable 
            and there is a limit of airports per city. */

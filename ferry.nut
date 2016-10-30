@@ -272,7 +272,7 @@ function Ferry::BuildAndStartFerry(dock1, dock2, path) {
     
     /* Buy the most expensive vehicle. */
     local vehicle = AIVehicle.BuildVehicle(depot, engine);
-    if(AIVehicle.IsValidVehicle(vehicle)) {
+    if(AIVehicle.IsValidVehicle(vehicle)) {        
         /* Schedule path. */
         if(!AIOrder.AppendOrder(vehicle, dock1, AIOrder.OF_NONE)) {
             AILog.Error("Failed to schedule the ferry: " + AIError.GetLastErrorString());
@@ -294,9 +294,27 @@ function Ferry::BuildAndStartFerry(dock1, dock2, path) {
         buoys.reverse();
         foreach(buoy in buoys)
             AIOrder.AppendOrder(vehicle, buoy, AIOrder.OF_NONE);
+            
+        /* Send for maintanance if too old. This is safer here, cause the vehicle won't get lost
+           and also saves us some opcodes. */
+        if(    !AIOrder.InsertConditionalOrder(vehicle, 0, 0)
+            || !AIOrder.InsertOrder(vehicle, 1, depot, AIOrder.OF_NONE) /* why OF_SERVICE_IF_NEEDED doesn't work? */
+            || !AIOrder.SetOrderCondition(vehicle, 0, AIOrder.OC_REMAINING_LIFETIME)
+            || !AIOrder.SetOrderCompareFunction(vehicle, 0, AIOrder.CF_MORE_THAN)
+            || !AIOrder.SetOrderCompareValue(vehicle, 0, 0)
+            ) {
+            AILog.Error("Failed to schedule the autoreplacement order: " + AIError.GetLastErrorString());
+            AIVehicle.SellVehicle(vehicle);
+            return false;
+        }
         
         //AIVehicle.SetName(vehicle, "");
-        AIVehicle.StartStopVehicle(vehicle);
+        if(!AIVehicle.StartStopVehicle(vehicle)) {
+            AILog.Error("Failed to start the ferry: " + AIError.GetLastErrorString());
+            AIVehicle.SellVehicle(vehicle);
+            return false;
+        }
+        
         return true;
     } else {
         AILog.Error("Failed to build the ferry: " + AIError.GetLastErrorString());

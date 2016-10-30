@@ -4,8 +4,6 @@ require("ferry.nut");
 class HeliFerry extends AIController {
     /* These vehicles will be sold. */
     sell_group = [-1, -1];
-    /* Max age months left before replacing. */
-    max_age_left = 3;
     
     constructor() {}
 }
@@ -24,7 +22,7 @@ function HeliFerry::Start() {
         AILog.Error("Cannot create a vehicles group");
     
     /* Autorenew vehicles when old. */
-    AICompany.SetAutoRenewMonths(-this.max_age_left);
+    AICompany.SetAutoRenewMonths(0);
     AICompany.SetAutoRenewStatus(true);
     
     /* Check if we have anything to do, if not repay the loan and wait. */
@@ -61,13 +59,10 @@ function HeliFerry::Start() {
            and ferries (there are 3 models from 1926, 1971 and 1968). */
         local upgraded_helis = UpgradeModel(heli.GetBestHelicopter(), AIVehicle.VT_AIR);
         local upgraded_ferries = UpgradeModel(ferry.GetBestFerry(), AIVehicle.VT_WATER);
-        
-        /* Replace too old vehicles. */
-        local old_replaced = ReplaceOld();
-        
+                
         /* Build statues when nothing better to do, they increase the stations rating. */
         local statues_founded = 0;
-        if(new_helis == 0 && new_ferries == 0 && upgraded_helis == 0 && upgraded_ferries == 0 && old_replaced == 0)
+        if(new_helis == 0 && new_ferries == 0 && upgraded_helis == 0 && upgraded_ferries == 0)
             statues_founded = BuildStatues();
         
         /* Print summary/ */
@@ -76,7 +71,6 @@ function HeliFerry::Start() {
         if(unprofitable_sold > 0) AILog.Info("Unprofitable vehicles sold: " + unprofitable_sold);
         if(upgraded_helis > 0) AILog.Info("Helicopters sent for upgrading: " + upgraded_helis);
         if(upgraded_ferries > 0) AILog.Info("Ferries sent for upgrading: " + upgraded_ferries);
-        if(old_replaced > 0) AILog.Info("Old vehicles sent for replacing: " + old_replaced);
         if(statues_founded > 1) AILog.Info("Statues founded: " + statues_founded);
         
         this.Sleep(50);
@@ -173,42 +167,6 @@ function HeliFerry::UpgradeModel(best_model, vehicle_type) {
         }
     }
     return sent_to_upgrade;
-}
-
-function HeliFerry::ReplaceOld() {
-    local sent_to_replace = 0;
-    
-    /* Find the vehicles to be upgraded. */
-    local old = AIVehicleList_DefaultGroup(AIVehicle.VT_AIR);
-    old.AddList(AIVehicleList_DefaultGroup(AIVehicle.VT_WATER));
-    old.Valuate(AIVehicle.GetAgeLeft);
-    old.KeepBelowValue(this.max_age_left * 30);
-    if(old.Count() > 0) {
-        /* We need to have money. */
-        local min_balance = AICompany.GetAutoRenewMoney(AICompany.COMPANY_SELF);
-        local balance = AICompany.GetBankBalance(AICompany.COMPANY_SELF);
-            
-        for(local vehicle = old.Begin(); old.HasNext(); vehicle = old.Next()) {
-            /* The vehicle model may not be available any more. */
-            local engine = AIVehicle.GetEngineType(vehicle);
-            if(AIEngine.IsValidEngine(engine)) {
-                /* Let's keep a safe amount of money left. */
-                local double_price = 2 * AIEngine.GetPrice(engine);
-                if(balance < double_price + min_balance)
-                    break;
-                balance -= double_price;
-                
-                /* We need to send them to depots to be replaced. */
-                if(!AIOrder.IsGotoDepotOrder(vehicle, AIOrder.ORDER_CURRENT))
-                    if(AIVehicle.SendVehicleToDepotForServicing(vehicle))
-                        sent_to_replace++;
-                    else
-                        AILog.Error("Failed to send the vehicle for servicing: " + AIError.GetLastErrorString());
-            }
-        }
-    }
-    
-    return sent_to_replace;
 }
 
 /* Build statues in the cities we have any stations. */

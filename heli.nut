@@ -174,15 +174,38 @@ function Heli::BuildAndStartHelicopter(heliport1, heliport2) {
                 return false;
             }
         } else {
-            /* Buy the most expensive vehicle. */
+            /* Buy the "best" vehicle. */
             local hangar = AIAirport.GetHangarOfAirport(depot);
             local vehicle = AIVehicle.BuildVehicle(hangar, engine);
             if(AIVehicle.IsValidVehicle(vehicle)) {
                 /* Schedule path. */
-                AIOrder.AppendOrder(vehicle, heliport1, AIOrder.OF_NONE);
-                AIOrder.AppendOrder(vehicle, heliport2, AIOrder.OF_NONE);
+                if(    !AIOrder.AppendOrder(vehicle, heliport1, AIOrder.OF_NONE)
+                    || !AIOrder.AppendOrder(vehicle, heliport2, AIOrder.OF_NONE)) {
+                    AILog.Error("Failed to schedule the route: " + AIError.GetLastErrorString());
+                    AIVehicle.SellVehicle(vehicle);
+                    return false;
+                }
+                
+                /* Send for maintanance if too old. This is safer here, cause the vehicle won't get lost
+                   and also saves us some opcodes. */
+                if(    !AIOrder.InsertConditionalOrder(vehicle, 0, 0)
+                    || !AIOrder.InsertOrder(vehicle, 1, hangar, AIOrder.OF_NONE) /* why OF_SERVICE_IF_NEEDED doesn't work? */
+                    || !AIOrder.SetOrderCondition(vehicle, 0, AIOrder.OC_REMAINING_LIFETIME)
+                    || !AIOrder.SetOrderCompareFunction(vehicle, 0, AIOrder.CF_MORE_THAN)
+                    || !AIOrder.SetOrderCompareValue(vehicle, 0, 0)
+                    ) {
+                    AILog.Error("Failed to schedule the autoreplacement order: " + AIError.GetLastErrorString());
+                    AIVehicle.SellVehicle(vehicle);
+                    return false;
+                }
+                
                 //AIVehicle.SetName(vehicle, "");
-                AIVehicle.StartStopVehicle(vehicle);
+                if(!AIVehicle.StartStopVehicle(vehicle)) {
+                    AILog.Error("Failed to start the helicopter: " + AIError.GetLastErrorString());
+                    AIVehicle.SellVehicle(vehicle);
+                    return false;
+                }
+                
                 break;
             } else if(AIError.GetLastError() != AIError.ERR_NOT_ENOUGH_CASH) {
                 AILog.Error("Failed to build the helicopter: " + AIError.GetLastErrorString());

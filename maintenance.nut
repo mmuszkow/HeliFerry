@@ -12,15 +12,15 @@ class Maintenance {
         /* Create groups. */
         this.sell_group[0] = AIGroup.CreateGroup(AIVehicle.VT_AIR);
         this.sell_group[1] = AIGroup.CreateGroup(AIVehicle.VT_WATER);
-        AIGroup.SetName(this.sell_group[0], "Helicopters to sell");
-        AIGroup.SetName(this.sell_group[1], "Ferries to sell");
+        AIGroup.SetName(this.sell_group[0], AICompany.GetName(AICompany.COMPANY_SELF) + "'s aircrafts to sell");
+        AIGroup.SetName(this.sell_group[1], AICompany.GetName(AICompany.COMPANY_SELF) + "'s ships to sell");
         if(!AIGroup.IsValidGroup(this.sell_group[0]) || !AIGroup.IsValidGroup(this.sell_group[1]))
             AILog.Error("Cannot create a vehicles group");
         
     }
 }
 
-function HeliFerry::SellUnprofitable() {
+function Maintenance::SellUnprofitable() {
     local sold = 0;
     
     /* Sell unprofitable in depots. */
@@ -64,13 +64,16 @@ function HeliFerry::SellUnprofitable() {
 }
 
 /* Replaces with best model, this function works only if we have 1 "type" of vehicle (e.g. helicopter or ferry). */
-function HeliFerry::UpgradeModel(best_model, vehicle_type) {
+function Maintenance::UpgradeModel(vehicle_type, best_model, cargo) {
     local sent_to_upgrade = 0;
     if(best_model != -1) {
         /* Find the vehicles to be upgraded. */
         local not_best_model = AIVehicleList_DefaultGroup(vehicle_type);
         not_best_model.Valuate(AIVehicle.GetEngineType);
         not_best_model.RemoveValue(best_model);
+        not_best_model.Valuate(AIVehicle.GetCapacity, cargo);
+        not_best_model.KeepAboveValue(0);
+        
         if(not_best_model.Count() > 0) {
             //AILog.Info("Found " + not_best_model.Count() + " upgradable vehicles");
             

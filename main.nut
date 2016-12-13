@@ -1,6 +1,7 @@
 require("heli.nut");
 require("ferry.nut");
 require("maintenance.nut");
+require("utils.nut");
 
 class HeliFerry extends AIController {
     constructor() {}
@@ -25,6 +26,7 @@ function HeliFerry::Start() {
     local loan_limit = AICompany.GetMaxLoanAmount();
     AICompany.SetLoanAmount(loan_limit);
         
+    local passengers_cargo = GetPassengersCargo();
     while(true) {
         /* Build heliports first as they are the most profitable 
            and there is a limit of airports per city. */
@@ -44,8 +46,8 @@ function HeliFerry::Start() {
         
         /* Update helicopters when new model comes out (there are 2 models from 1957 and 1997)
            and ferries (there are 3 models from 1926, 1971 and 1968). */
-        local upgraded_helis = maintenance.UpgradeModel(heli.GetBestHelicopter(), AIVehicle.VT_AIR);
-        local upgraded_ferries = maintenance.UpgradeModel(ferry.GetBestFerry(), AIVehicle.VT_WATER);
+        local upgraded_helis = maintenance.UpgradeModel(AIVehicle.VT_AIR, heli.GetBestHelicopter(), passengers_cargo);
+        local upgraded_ferries = maintenance.UpgradeModel(AIVehicle.VT_WATER, ferry.GetBestFerry(), passengers_cargo);
 
         /* Build statues when nothing better to do, they increase the stations rating. */
         local statues_founded = 0;

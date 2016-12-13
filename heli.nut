@@ -81,6 +81,9 @@ function Heli::BuildHeliPort(city_loc) {
     /* 10 tiles from the city center at most. */
     local heliport_tiles = AITileList();
     SafeAddRectangle(heliport_tiles, city_loc, this.city_center_range);
+    /* Avoid demolishing roads. */
+    heliport_tiles.Valuate(AITile.HasTransportType, AITile.TRANSPORT_ROAD);
+    heliport_tiles.RemoveValue(1);
     /* Terrain must be flat. */
     heliport_tiles.Valuate(AITile.GetSlope);
     heliport_tiles.KeepValue(AITile.SLOPE_FLAT);

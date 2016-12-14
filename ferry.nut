@@ -53,6 +53,10 @@ function Ferry::AreFerriesAllowed() {
     /* Ships disabled. */
     if(AIGameSettings.IsDisabledVehicleType(AIVehicle.VT_WATER))
         return false;
+
+    /* Disabled in AI settings. */
+    if(!AIController.GetSetting("build_ferries"))
+        return false;
     
     /* Max 0 ships. */
     local veh_allowed = AIGameSettings.GetValue("vehicle.max_ships");

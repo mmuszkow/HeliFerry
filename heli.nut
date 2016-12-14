@@ -237,6 +237,10 @@ function Heli::AreHelicoptersAllowed() {
         || !AIAirport.IsValidAirportType(AIAirport.AT_HELIDEPOT))
         return false;
     
+    /* Disabled in AI settings. */
+    if(!AIController.GetSetting("build_helicopters"))
+        return false;
+    
     /* Max 0 aircrafts. */
     local veh_allowed = AIGameSettings.GetValue("vehicle.max_aircraft");
     if(veh_allowed == 0)

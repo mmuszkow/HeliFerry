@@ -8,7 +8,7 @@ require("pathfinder/coast.nut");
 
 class Ferry {
     /* Max dock distance from the city center. */
-    max_dock_distance = 20;
+    max_dock_distance = 15;
     /* Open new connections only in cities with this population. */
     min_population = 500;
     /* Max Manhattan distance between 2 cities to open a new connection. */
@@ -82,15 +82,15 @@ function GetCoastTilesCloseToCity(town, range, cargo_id) {
     local city = AITown.GetLocation(town);
     local tiles = AITileList();
     SafeAddRectangle(tiles, city, range);
+    tiles.Valuate(AITile.GetClosestTown);
+    tiles.KeepValue(town);
     tiles.Valuate(AITile.IsCoastTile);
     tiles.KeepValue(1);
     tiles.Valuate(IsSimpleSlope);
     tiles.KeepValue(1);
-    tiles.Valuate(AITile.GetClosestTown);
-    tiles.KeepValue(town);
     /* Tile must accept passangers. */
     tiles.Valuate(AITile.GetCargoAcceptance, cargo_id, 1, 1,
-                  AIStation.GetCoverageRadius(AIStation.STATION_DOCK));
+          AIStation.GetCoverageRadius(AIStation.STATION_DOCK));
     tiles.KeepAboveValue(7); /* as doc says */
     return tiles;
 }
@@ -331,11 +331,20 @@ function Ferry::BuildFerryRoutes() {
     if(!AreFerriesAllowed())
         return ferries_built;
 
-    local towns = AITownList();
-    towns.Valuate(AITown.GetPopulation);
-    towns.KeepAboveValue(this.min_population);
-    towns.Valuate(GetCoastTileClosestToCity, this.max_dock_distance, this._passenger_cargo_id);
-    towns.RemoveValue(-1);
+    /* To avoid exceeding CPU limit in Valuator, we process the towns list in parts */
+    local all_towns = AITownList();
+    local towns = AIList();
+    for(local i=0; i<all_towns.Count(); i+=50) {
+        local part = AIList();
+        part.AddList(all_towns);
+        part.RemoveTop(i);
+        part.KeepTop(50);
+        part.Valuate(AITown.GetPopulation);
+        part.KeepAboveValue(this.min_population);
+        part.Valuate(GetCoastTileClosestToCity, this.max_dock_distance, this._passenger_cargo_id);
+        part.RemoveValue(-1);
+        towns.AddList(part);
+    }
     
     //AILog.Info(towns.Count() + " towns eligible for ferry, min " + this._min_passengers + " passengers to open a new route");
     

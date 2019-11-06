@@ -2,7 +2,6 @@
    Builds ferries/hovercrafts. */
 
 require("utils.nut");
-require("pairhashset.nut");
 require("pathfinder/line.nut");
 require("pathfinder/coast.nut");
 
@@ -29,23 +28,12 @@ class Ferry {
     /* Pathfinders. */
     _line_pathfinder = StraightLinePathfinder();
     _coast_pathfinder = CoastPathfinder();
-    /* Cache of which cities are not connected. */
-    _not_connected = null;
+    /* Cache of coast tiles that cannot be not connected by water.
+     * We use AIList as a set storing two 32-bit pairs of tiles. */
+    _not_connected = AIList();
     
     constructor() {
         this._passenger_cargo_id = GetPassengersCargo();
-        
-        /* Dynamic hashset size. */
-        local size = AIMap.GetMapSize();
-        
-        if(size > 4194304) /* bigger than 2048x2048 */
-            this._not_connected = PairHashSet(65536);
-        else if(size > 1048576) /* bigger than 1024x1024 */
-            this._not_connected = PairHashSet(32768);
-        else if(size > 262144)  /* bigger than 512x512 */
-            this._not_connected = PairHashSet(16384);
-        else
-            this._not_connected = PairHashSet(8192);
     }
 }
    
@@ -402,7 +390,9 @@ function Ferry::BuildFerryRoutes() {
             if(AIMap.DistanceManhattan(coast1, coast2) < 20)
                 continue;
 
-            if(this._not_connected.Contains(coast1, coast2))
+            /* Check if cache contains info that the two coasts are not connected. 
+             * Tile index is 32-bit, AIList item is 64-bit so we can store two together. */
+            if(this._not_connected.HasItem((coast1<<32)|coast2))
                 continue;
             
             /* Skip cities that are not connected by water. */
@@ -412,7 +402,9 @@ function Ferry::BuildFerryRoutes() {
             else if(this._coast_pathfinder.FindPath(coast1, coast2, this.max_path_len))
                 path = this._coast_pathfinder.path;
             else {
-                this._not_connected.Add(coast1, coast2);
+                /* Tile index is 32-bit, AIList item is 64-bit so we can store two together. */
+                this._not_connected.AddItem((coast1<<32)|coast2, 0);
+                this._not_connected.AddItem((coast2<<32)|coast1, 0);
                 continue;
             }
             
@@ -439,7 +431,5 @@ function Ferry::BuildFerryRoutes() {
         }
     }
             
-    //this._not_connected.Debug();
-    
     return ferries_built;
 }

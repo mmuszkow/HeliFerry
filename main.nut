@@ -76,9 +76,9 @@ function HeliFerry::SetCompanyName() {
     }
     
     if(AICompany.GetPresidentGender(AICompany.COMPANY_SELF) == AICompany.GENDER_MALE)
-        AICompany.SetPresidentName("Mr. Moshe Goldbaum");
+        AICompany.SetPresidentName("Griffin Southsea");
     else
-        AICompany.SetPresidentName("Mrs. Rivkah Blumfeld");
+        AICompany.SetPresidentName("Inga Sikorska");
 }
 
 /* Build statues in the cities we have any stations. */
